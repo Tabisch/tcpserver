@@ -6,31 +6,66 @@ using System.Text;
 using System.Threading;
 using list_server;
 
-namespace PC_Liste_Server
+namespace list_server
 {
     class Setup
     {
-        private static readonly Socket serversocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        public static readonly int port = 801;
+        private static Socket serversocket;
+        static int port = 801;
 
         static ClientComController ccc;
         static Logger lggr;
 
+        static bool server = true;
+        static string host = "bspcliste";
+
         static void Main(string[] args)
         {
             Initilize();
-            SocketSetup();
         }
 
         private static void Initilize()
         {
             ccc = ClientComController.getInstance();
             lggr = Logger.GetInstance();
+
+            if(server)
+            {
+                SetupServer();
+            }
+            else
+            {
+                SetupClient();
+            }
         }
 
-        private static void SocketSetup()
+        private static void SetupClient()
         {
-            if (SetupServer())
+            ClientCom cc = null;
+
+            do
+            {
+                if (cc == null)
+                {
+                    Log("Setup Client");
+                    cc = new ClientCom(host, port);
+                }
+                else
+                {
+                    if (cc.GetStatus()[3] == true)
+                    {
+                        cc = null;
+                    }
+                }
+
+                Thread.Sleep(5000);
+
+            } while (true);
+        }
+
+        private static void SetupServer()
+        {
+            if (SocketSetup())
             {
                 Thread listen = new Thread(ListenForClients);
                 listen.Start();
@@ -44,11 +79,12 @@ namespace PC_Liste_Server
             }
         }
 
-        private static bool SetupServer()
+        private static bool SocketSetup()
         {
             try
             {
                 //Bindet Socket an Port und akzeptiert immer
+                serversocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
                 Log("Setting up server");
                 serversocket.Bind(new IPEndPoint(IPAddress.Any, port));

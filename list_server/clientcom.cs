@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Runtime.Serialization.Formatters.Binary;
+using System.Net;
 
 namespace list_server
 {
@@ -38,6 +39,20 @@ namespace list_server
             Initilze();
         }
 
+        public ClientCom(string host,int port)
+        {
+            dc = DataController.GetInstance();
+            l = Logger.GetInstance();
+
+            this.ID = "Client";
+
+            ConnectAsClient(host,port);
+
+            Log("Connected as Client");
+
+            Initilze();
+        }
+
         private void Initilze()
         {
             Log("Entering Client initializing phase");
@@ -53,6 +68,39 @@ namespace list_server
             Receiver.Start();
             Sender = new Thread(Send);
             Sender.Start();
+        }
+
+        public void ConnectAsClient(string host,int port)
+        {
+            IPHostEntry hostEntry;
+
+            hostEntry = Dns.GetHostEntry(host);
+
+            if (hostEntry.AddressList.Length > 0)
+            {
+                bool working = false;
+
+                do
+                {
+
+                    try
+                    {
+
+                        var ip = hostEntry.AddressList[0];
+                        Client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                        Client.Connect(ip, port);
+
+                        working = true;
+
+                    }
+                    catch (Exception)
+                    {
+
+                    }
+
+                } while (working == false);
+
+            }
         }
 
         public void CloseConnection(string text)
@@ -184,6 +232,11 @@ namespace list_server
         private void Receive()
         {
             Log("Receiver initalized");
+
+            if(ID == "Client")
+            {
+                Thread.Sleep(5000);
+            }
 
             do
             {

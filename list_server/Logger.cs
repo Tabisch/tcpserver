@@ -21,6 +21,9 @@ namespace list_server
         string filename = "log.txt";
         string filepath;
 
+        int logclock = 10;
+        int clock;
+
         List<string> logstack;
 
         private Logger()
@@ -29,6 +32,7 @@ namespace list_server
 
             CreateFilePath();
             DeleteOldLogFile();
+            SetClock();
 
             filelogger = new Thread(LogToTextFile);
             filelogger.Start();        
@@ -47,6 +51,11 @@ namespace list_server
         private void AddToLogStack(string Text)
         {
             logstack.Add(Text);
+        }
+
+        private void SetClock()
+        {
+            clock = logclock * 1000;
         }
 
         public void Log(string System, string Text)
@@ -91,7 +100,7 @@ namespace list_server
                         MessageBox.Show("Logfile access error", "Issues accessing the logfile");
                     }
                 }
-                Thread.Sleep(5000);
+                Thread.Sleep(clock);
             }
 
         }
