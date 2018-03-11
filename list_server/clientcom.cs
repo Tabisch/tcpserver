@@ -12,9 +12,8 @@ namespace list_server
     {
 
         Socket Client;
-        Thread Receiver;
-        Thread Sender;
-        Thread windup;
+
+        DateTime timestamp;
 
         DataController dc;
         Logger l;
@@ -39,68 +38,20 @@ namespace list_server
             Initilze();
         }
 
-        public ClientCom(string host,int port)
-        {
-            dc = DataController.GetInstance();
-            l = Logger.GetInstance();
-
-            this.ID = "Client";
-
-            ConnectAsClient(host,port);
-
-            Log("Connected as Client");
-
-            Initilze();
-        }
-
         private void Initilze()
         {
             Log("Entering Client initializing phase");
 
-            flag = new bool[4];
+            flag = new bool[3];
 
-            
+            flag[0] = false;
+            flag[1] = false;
+            flag[2] = false;
+
+
             Client.ReceiveTimeout = 20000;
 
             sendrequests = new List<string>();
-
-            Receiver = new Thread(Receive);
-            Receiver.Start();
-            Sender = new Thread(Send);
-            Sender.Start();
-        }
-
-        public void ConnectAsClient(string host,int port)
-        {
-            IPHostEntry hostEntry;
-
-            hostEntry = Dns.GetHostEntry(host);
-
-            if (hostEntry.AddressList.Length > 0)
-            {
-                bool working = false;
-
-                do
-                {
-
-                    try
-                    {
-
-                        var ip = hostEntry.AddressList[0];
-                        Client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                        Client.Connect(ip, port);
-
-                        working = true;
-
-                    }
-                    catch (Exception)
-                    {
-
-                    }
-
-                } while (working == false);
-
-            }
         }
 
         public void CloseConnection(string text)
@@ -109,93 +60,44 @@ namespace list_server
             {
                 flag[0] = true;
                 Log(text);
-
-                windup = new Thread(Windup);
-                windup.Start();
             }
         }
 
-        private void Windup()
+        public void Windup()
         {
-            Log("Windup started");
-
-            while (true)
+            if (flag[0] && flag[1])
             {
-                if (!Receiver.IsAlive)
-                {
-                    flag[1] = true;
-                }
-
-                if (!Sender.IsAlive)
-                {
-                    flag[2] = true;
-                }
-
-                if (flag[0] && flag[1] && flag[2])
-                {
-                    flag[3] = true;
-                    Log("Windup finished");
-                    FinishWindup();
-                    break;
-                }
-
-                Thread.Sleep(5000);
+                flag[2] = true;
+                Log("Client " + GetID() + " dead");
             }
-        }
-
-        private void FinishWindup()
-        {
-            sendrequests = null;
-            Client.Close();
-            Client = null;
-            Receiver = null;
-            Sender = null;
-
-            dc = null;
-            l = null;
         }
 
         public void Send()
         {
-            bool empty = false;
-
-            while (true)
+            if (flag[1] == false)
             {
-                if (sendrequests.Count == 0)
+                if (SendRequestStackSize() == 0)
                 {
                     if (flag[0] == false)
                     {
-                        if (empty)
-                        {
-                            AddSendRequest("beat");
-                            empty = false;
-                        }
-                        else
-                        {
-                            Thread.Sleep(5500);
-                            empty = true;
-                        }
+                        AddSendRequest("beat");
                     }
                     else
                     {
-                        if (SendRequestStackSize() == 0)
-                        {
-                            break;
-                        }
+                        flag[1] = true;
                     }
                 }
                 else
                 {
-                    empty = false;
-
-                    if (Sending(sendrequests[0]))
+                    for (int i = 0; i < SendRequestStackSize(); i++)
                     {
-                        sendrequests.Remove(sendrequests[0]);
+                        if (Sending(sendrequests[0]))
+                        {
+                            sendrequests.Remove(sendrequests[0]);
+                        }
                     }
                 }
             }
-
-            Log("Sender closed");
         }
 
         private bool Sending(string text)
@@ -229,22 +131,23 @@ namespace list_server
             return sendrequests.Count;
         }
 
-        private void Receive()
+        public void Receive()
         {
-            Log("Receiver initalized");
-
-            if(ID == "Client")
+            if (ID == "Client")
             {
                 Thread.Sleep(5000);
             }
 
-            do
+            if (flag[0] == false)
             {
                 Log("Waiting for data");
 
                 try
                 {
                     int BufferReadsize;
+
+                    Log("Buffer Initializierung");
+
                     byte[] Buffer = new byte[Client.SendBufferSize]; ;
 
                     BufferReadsize = Client.Receive(Buffer);
@@ -271,9 +174,7 @@ namespace list_server
                 {
                     CloseConnection("Execption kill");
                 }
-            } while (flag[0] == false);
-
-            Log("Receiver closed");
+            }
         }
 
         private void Log(string Text)
@@ -324,23 +225,45 @@ namespace list_server
         {
             return ID;
         }
+
+        public bool Dead()
+        {
+            if(flag[2])
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
     }
 
     class ClientComController
     {
         private static ClientComController ccc;
         private List<ClientCom> cc;
+        private List<ClientCom> cctemp;
         private List<string> idlist;
-        Thread DeadClientCleaner;
+
+        bool lockloop = false;
+
+        Thread Receiver;
+
+        Logger lggr;
 
         private ClientComController()
         {
+            lggr = Logger.GetInstance();
             cc = new List<ClientCom>();
             idlist = new List<string>();
-            DeadClientCleaner = new Thread(CleanDeadClient);
+            Receiver = new Thread(Receive);
+            Receiver.Start();
+
+            Log("ClientController initialized");
         }
 
-        public static ClientComController getInstance()
+        public static ClientComController GetInstance()
         {
             if (ccc == null)
             {
@@ -352,6 +275,7 @@ namespace list_server
 
         public void Add(ClientCom clientcom)
         {
+            Log("Client " + clientcom.Name + " added");
             cc.Add(clientcom);
         }
 
@@ -391,13 +315,16 @@ namespace list_server
             return finalString;
         }
 
-        public void CleanDeadClient()
+        private void CleanDeadClient()
         {
-            foreach (ClientCom client in cc)
+            for (int i = 0; i < Size(); i++)
             {
-                if (client.GetStatus()[3])
+                cc[i].Windup();
+
+                if (cc[i].Dead())
                 {
-                    cc.Remove(client);
+                    Log("Client " + cc[i].GetID() + " removed");
+                    cc.Remove(cc[i]);
                 }
             }
         }
@@ -412,11 +339,14 @@ namespace list_server
             cc.Clear();
         }
 
+        private void Log(string text)
+        {
+            lggr.Log("ClientController",text);
+        }
+
         public ClientCom GetClientByID(string ID)
         {
             ClientCom clienttoreturn = null;
-
-            CleanDeadClient();
 
             foreach (ClientCom client in cc)
             {
@@ -427,6 +357,20 @@ namespace list_server
             }
 
             return clienttoreturn;
+        }
+
+        private void Receive()
+        {
+            while (true)
+            {
+                CleanDeadClient();
+
+                for(int i = 0; i < Size(); i++)
+                {
+                    cc[i].Receive();
+                    cc[i].Send();
+                }
+            }
         }
     }
 }

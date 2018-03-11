@@ -70,7 +70,7 @@ namespace list_server
             }
         }
 
-        public void Log(string text)
+        private void Log(string text)
         {
             Log("Logger", text);
         }
@@ -114,7 +114,7 @@ namespace list_server
         {
             if(File.Exists(filepath))
             {
-                File.Delete(filepath);
+               File.Delete(filepath);
             }
         }
 

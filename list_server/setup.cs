@@ -26,47 +26,18 @@ namespace list_server
 
         private static void Initilize()
         {
-            ccc = ClientComController.getInstance();
             lggr = Logger.GetInstance();
 
-            if(server)
-            {
-                SetupServer();
-            }
-            else
-            {
-                SetupClient();
-            }
-        }
-
-        private static void SetupClient()
-        {
-            ClientCom cc = null;
-
-            do
-            {
-                if (cc == null)
-                {
-                    Log("Setup Client");
-                    cc = new ClientCom(host, port);
-                }
-                else
-                {
-                    if (cc.GetStatus()[3] == true)
-                    {
-                        cc = null;
-                    }
-                }
-
-                Thread.Sleep(5000);
-
-            } while (true);
+            SetupServer();
+            Console.Title = "Server";
         }
 
         private static void SetupServer()
         {
             if (SocketSetup())
             {
+                ccc = ClientComController.GetInstance();
+
                 Thread listen = new Thread(ListenForClients);
                 listen.Start();
                 Log("Server started listening");

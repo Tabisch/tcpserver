@@ -22,7 +22,7 @@ namespace list_server
         {
             rs = new Requeststack();
             l = Logger.GetInstance();
-            ccc = ClientComController.getInstance();
+            ccc = ClientComController.GetInstance();
 
             worker = new Thread(DataControllerWorker);
             worker.Start();
