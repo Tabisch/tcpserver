@@ -80,6 +80,8 @@ namespace list_server
                         Log(e.ToString());
                     }
                 }
+
+                Thread.Sleep(5000);
             }
         }
 

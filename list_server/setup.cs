@@ -5,22 +5,25 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using list_server;
+using System.Security.Cryptography.X509Certificates;
+using System.IO;
 
 namespace list_server
 {
     class Setup
     {
-        private static Socket serversocket;
+        static X509Certificate2 serverCertificate = null;
+
+        static TcpListener serversocket;
         static int port = 801;
 
         static ClientComController ccc;
         static Logger lggr;
 
-        static bool server = true;
-        static string host = "bspcliste";
-
         static void Main(string[] args)
         {
+            serverCertificate = new X509Certificate2();
+            serverCertificate.Import(File.ReadAllBytes(@"C:\Users\Tobias\Desktop\cert.pfx"), "1", X509KeyStorageFlags.MachineKeySet);
             Initilize();
         }
 
@@ -38,9 +41,9 @@ namespace list_server
             {
                 ccc = ClientComController.GetInstance();
 
-                Thread listen = new Thread(ListenForClients);
-                listen.Start();
                 Log("Server started listening");
+
+                ListenForClients();
             }
             else
             {
@@ -55,10 +58,10 @@ namespace list_server
             try
             {
                 //Bindet Socket an Port und akzeptiert immer
-                serversocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
                 Log("Setting up server");
-                serversocket.Bind(new IPEndPoint(IPAddress.Any, port));
+                serversocket = new TcpListener(IPAddress.Any,port);
+                serversocket.Start();
 
                 return true;
             }
@@ -79,8 +82,7 @@ namespace list_server
 
                 string pregen = ccc.GenerateID();
 
-                serversocket.Listen(0);
-                ccc.Add(new ClientCom(serversocket.Accept(), pregen));
+                ccc.Add(new ClientCom(serversocket.AcceptTcpClient(), pregen , serverCertificate));
             }
         }
 
