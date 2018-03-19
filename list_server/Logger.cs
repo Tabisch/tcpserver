@@ -24,6 +24,9 @@ namespace list_server
         int logclock = 10;
         int clock;
 
+        int loglevel;
+        int logleveldefault = 1;
+
         List<string> logstack;
 
         private Logger()
@@ -58,21 +61,28 @@ namespace list_server
             clock = logclock * 1000;
         }
 
-        public void Log(string System, string Text)
+        public void Log(string System, string Text,int value)
         {
-            string FormatedLogString = FormatString(System, Text);
-
-            LogToConsole(FormatedLogString);
-
-            if (System != "Logger")
+            if (lggr.LogPriorty(value, loglevel))
             {
+
+                string FormatedLogString = FormatString(System, Text);
+
+                LogToConsole(FormatedLogString);
+
                 AddToLogStack(FormatedLogString);
+
             }
         }
 
-        private void Log(string text)
+        private void Log(string text, int value)
         {
-            Log("Logger", text);
+            Log("Logger", text, value);
+        }
+
+        public int GetDefaultLoglevel()
+        {
+            return logleveldefault;
         }
 
         private void LogToConsole(string Text)
@@ -83,7 +93,7 @@ namespace list_server
         private void LogToTextFile()
         {
 
-            Log("Textfilelogger started");
+            Log("Textfilelogger started",2);
 
             while(true)
             {
@@ -93,7 +103,7 @@ namespace list_server
                     try
                     {
                         File.AppendAllText(filepath, MakeOneWriteString());
-                        Log("Logged to " + filename);
+                        Log("Logged to " + filename,1);
                     }
                     catch (Exception)
                     {
@@ -140,6 +150,18 @@ namespace list_server
         private void ClearStack()
         {
             logstack.Clear();
+        }
+
+        public bool LogPriorty(int value,int loglevel)
+        {
+            bool log = false;
+
+            if (loglevel >= value)
+            {
+                log = true;
+            }
+
+            return log;
         }
     }
 }

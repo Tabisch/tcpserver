@@ -14,14 +14,17 @@ namespace list_server
 
         Requeststack rs;
         ClientComController ccc;
-        Logger l;
+        Logger lggr;
 
         Thread worker;
+
+        int loglevel;
+        int logleveldefault = 1;
 
         private DataController()
         {
             rs = new Requeststack();
-            l = Logger.GetInstance();
+            lggr = Logger.GetInstance();
             ccc = ClientComController.GetInstance();
 
             worker = new Thread(DataControllerWorker);
@@ -66,18 +69,18 @@ namespace list_server
                 {
                     try
                     {
-                        Log("Stacksize = " + rs.Size());
+                        Log("Stacksize = " + rs.Size(),1);
 
                         string id = rs.GetRequestID();
                         string content = rs.GetRequestContent();
                         
                         ccc.GetClientByID(id).AddSendRequest("Echo : " + content);
-                        Log("Added " + "Echo : " + content + " to " + id);
+                        Log("Added " + "Echo : " + content + " to " + id,1);
                     }
                     catch (Exception e)
                     {
-                        Log("DataControllerWorker error");
-                        Log(e.ToString());
+                        Log("DataControllerWorker error",4);
+                        Log(e.ToString(),4);
                     }
                 }
 
@@ -95,9 +98,14 @@ namespace list_server
             rs.Clear();
         }
 
-        private void Log(string text)
+        private void Log(string text, int value)
         {
-            l.Log("DataController",text);
+            lggr.Log("DataController", text, value);
+        }
+
+        public int GetDefaultLoglevel()
+        {
+            return logleveldefault;
         }
 
     }

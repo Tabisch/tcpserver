@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.IO;
 
 namespace list_server
 {
@@ -10,16 +11,21 @@ namespace list_server
     {
         static Settings setting;
 
+        Logger lggr;
         List<SettingsSet> ss;
+
+        int loglevel;
+        int logleveldefault = 1;
 
         private Settings()
         {
             ss = new List<SettingsSet>();
+            lggr = Logger.GetInstance();
         }
-        
+
         public Settings GetInstance()
         {
-            if(setting == null)
+            if (setting == null)
             {
                 setting = new Settings();
             }
@@ -31,33 +37,67 @@ namespace list_server
         {
             string value = null;
 
-            foreach(SettingsSet s in ss)
+            foreach (SettingsSet s in ss)
             {
-                if(s.ReturnName() == Name)
+                if (s.ReturnName() == Name)
                 {
                     value = s.ReturnValue();
+                    break;
                 }
             }
 
             return value;
         }
 
-        public int ConvertForLogger(string input)
+        public int GetLoggerSetting(string input,int defaultlevel)
         {
             int value = 0;
 
             input = input.ToLower();
 
-            switch(input)
+            switch (input)
             {
-                case "none"     : value = 0;    break;
-                case "low"      : value = 1;    break;
-                case "high"     : value = 2;    break;
-                case "all"      : value = 3;    break;
-                default         :               break;
+                case "none": value = 4; break;
+                case "low": value = 1; break;
+                case "high": value = 2; break;
+                case "all": value = 3; break;
+                default: break;
+            }
+
+            if(value == 0)
+            {
+                value = defaultlevel;
             }
 
             return value;
+        }
+
+        public int GetLogValue(string input)
+        {
+            int defaultlog;
+
+            return 0;
+        }
+
+        private void RefreshFromFile()
+        {
+
+        }
+
+        public void Save(string Name,string value)
+        {
+
+        }
+
+        private void Log(string text, int value)
+        {
+
+            lggr.Log("Settings", text, value);
+        }
+
+        public int GetDefaultLoglevel()
+        {
+            return logleveldefault;
         }
     }
 

@@ -20,6 +20,9 @@ namespace list_server
         static ClientComController ccc;
         static Logger lggr;
 
+        static int loglevel;
+        static int logleveldefault = 1;
+
         static void Main(string[] args)
         {
             serverCertificate = new X509Certificate2();
@@ -41,7 +44,7 @@ namespace list_server
             {
                 ccc = ClientComController.GetInstance();
 
-                Log("Server started listening");
+                Log("Server started listening",3);
 
                 ListenForClients();
             }
@@ -59,7 +62,7 @@ namespace list_server
             {
                 //Bindet Socket an Port und akzeptiert immer
 
-                Log("Setting up server");
+                Log("Setting up server",3);
                 serversocket = new TcpListener(IPAddress.Any,port);
                 serversocket.Start();
 
@@ -67,9 +70,9 @@ namespace list_server
             }
             catch (Exception e)
             {
-                Log("Setup failed");
+                Log("Setup failed",4);
 
-                Log(e.ToString());
+                Log(e.ToString(),4);
                 return false;
             }
         }
@@ -86,9 +89,14 @@ namespace list_server
             }
         }
 
-        private static void Log(string text)
+        private static void Log(string text, int value)
         {
-            lggr.Log("Setup",text);
+            lggr.Log("Setup", text, value);
+        }
+
+        public int GetDefaultLoglevel()
+        {
+            return logleveldefault;
         }
     }
 }

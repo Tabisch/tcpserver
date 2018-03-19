@@ -8,6 +8,7 @@ using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using System.Net.Security;
 using System.Security.Authentication;
+using System.IO;
 
 namespace list_server
 {
@@ -16,11 +17,12 @@ namespace list_server
         TcpClient Client;
         X509Certificate cert;
         SslStream sslStream;
+        NetworkStream nonsslStream;
 
         DateTime timestamp;
 
         DataController dc;
-        Logger l;
+        Logger lggr;
 
         List<string> sendrequests;
 
@@ -30,34 +32,37 @@ namespace list_server
         string ID;
         bool ssl;
 
+        int loglevel;
+        int logleveldefault = 1;
+
         public ClientCom(TcpClient client, string ID , X509Certificate cert)
         {
             dc = DataController.GetInstance();
-            l = Logger.GetInstance();
+            lggr = Logger.GetInstance();
 
             this.cert = cert;
 
             this.ID = ID;
             this.Client = client;
 
-            Log("Connected");
+            Log("Connected",1);
 
             Initilze();
         }
 
         private void Initilze()
         {
-            Log("Entering Client initializing phase");
-
-            sslStream = new SslStream(Client.GetStream(),false);
-
+            Log("Entering Client initializing phase",1);
+            
             try
             {
+                sslStream = new SslStream(Client.GetStream(), false);
                 sslStream.AuthenticateAsServer(cert, false, SslProtocols.Tls, true);
             }
             catch
             {
                 ssl = false;
+                nonsslStream = Client.GetStream();
             }
             
 
@@ -79,7 +84,7 @@ namespace list_server
             if (flag[0] == false)
             {
                 flag[0] = true;
-                Log(text);
+                Log(text,1);
             }
         }
 
@@ -88,7 +93,7 @@ namespace list_server
             if (flag[0] && flag[1])
             {
                 flag[2] = true;
-                Log("Client " + GetID() + " dead");
+                Log("Client " + GetID() + " dead",1);
             }
         }
 
@@ -124,17 +129,35 @@ namespace list_server
         {
             byte[] Buffer = Encoding.ASCII.GetBytes(text + "\0");
 
-            try
+            if(ssl)
             {
-                sslStream.Write(Buffer);
-                Log("Sending : " + text);
-                return true;
+                try
+                {
+                    sslStream.Write(Buffer);
+                    Log("Sending : " + text, 1);
+                    return true;
+                }
+                catch (SocketException)
+                {
+                    CloseConnection("Send Error");
+                    sendrequests.Clear();
+                    return false;
+                }
             }
-            catch (SocketException)
+            else
             {
-                CloseConnection("Send Error");
-                sendrequests.Clear();
-                return false;
+                try
+                {
+                    nonsslStream.Write(Buffer,0,Buffer.Length);
+                    Log("Sending : " + text, 1);
+                    return true;
+                }
+                catch (SocketException)
+                {
+                    CloseConnection("Send Error");
+                    sendrequests.Clear();
+                    return false;
+                }
             }
         }
 
@@ -155,17 +178,15 @@ namespace list_server
         {
             if (flag[0] == false)
             {
-                Log("Waiting for data");
+                Log("Waiting for data",1);
 
                 try
                 {
                     int BufferReadsize;
 
-                    Log("Buffer Initializierung");
+                    byte[] Buffer = new byte[Client.ReceiveBufferSize];
 
-                    byte[] Buffer = new byte[2048];
-
-                    BufferReadsize = sslStream.Read(Buffer,0,Buffer.Length);
+                    BufferReadsize = Receive(Buffer);
 
                     if (BufferReadsize > 0)
                     {
@@ -175,7 +196,7 @@ namespace list_server
 
                         foreach (string element in clean)
                         {
-                            Log("Received : " + element);
+                            Log("Received : " + element,1);
 
                             dc.AddToStack(ID, element, true);
                         }
@@ -192,9 +213,21 @@ namespace list_server
             }
         }
 
-        private void Log(string Text)
+        private int Receive(byte[] Buffer)
         {
-            l.Log("Client : " + ID, Text);
+            if (ssl)
+            {
+                return sslStream.Read(Buffer, 0, Buffer.Length);
+            }
+            else
+            {
+                return nonsslStream.Read(Buffer, 0, Buffer.Length);
+            }
+        }
+
+        private void Log(string Text, int value)
+        {
+            lggr.Log("Client : " + ID, Text,value);
         }
 
         private List<string> CleanupInput(string text)
@@ -261,7 +294,7 @@ namespace list_server
         private List<ClientCom> ccaddstack;
         private List<string> idlist;
 
-        bool lockloop = false;
+        int logleveldefault = 1;
 
         Thread Receiver;
 
@@ -273,10 +306,10 @@ namespace list_server
             cc = new List<ClientCom>();
             ccaddstack = new List<ClientCom>();
             idlist = new List<string>();
-            Receiver = new Thread(Receive);
+            Receiver = new Thread(RunClients);
             Receiver.Start();
 
-            Log("ClientController initialized");
+            Log("ClientController initialized",1);
         }
 
         public static ClientComController GetInstance()
@@ -291,7 +324,7 @@ namespace list_server
 
         public void Add(ClientCom clientcom)
         {
-            Log("Client " + clientcom.Name + " added");
+            Log("Client " + clientcom.Name + " added",1);
             cc.Add(clientcom);
         }
 
@@ -308,11 +341,12 @@ namespace list_server
         {
             bool check = true;
 
-            foreach (ClientCom client in cc)
+            foreach (string id in idlist)
             {
-                if (client.GetID() == ID)
+                if (id == ID)
                 {
                     check = false;
+                    break;
                 }
             }
 
@@ -350,7 +384,7 @@ namespace list_server
 
                 if (cc[i].Dead())
                 {
-                    Log("Client " + cc[i].GetID() + " removed");
+                    Log("Client " + cc[i].GetID() + " removed",1);
                     idlist.Remove(cc[i].GetID());
                     cc.Remove(cc[i]);
                 }
@@ -367,9 +401,14 @@ namespace list_server
             cc.Clear();
         }
 
-        private void Log(string text)
+        private void Log(string text, int value)
         {
-            lggr.Log("ClientController",text);
+            lggr.Log("ClientController", text,value);
+        }
+
+        public int GetDefaultLoglevel()
+        {
+            return logleveldefault;
         }
 
         public ClientCom GetClientByID(string ID)
@@ -387,7 +426,7 @@ namespace list_server
             return clienttoreturn;
         }
 
-        private void Receive()
+        private void RunClients()
         {
             while (true)
             {
